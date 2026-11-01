@@ -2,7 +2,6 @@
 # file: api/index.py
 import os, re, subprocess, json, sys, zipfile, shutil
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
-from pydantic import BaseModel
 
 app = FastAPI(title="Luraph VM Deobfuscator Web")
 
@@ -10,9 +9,6 @@ TMP_IN = "/tmp/payload.lua"
 TMP_OUT = "/tmp/clean.luau"
 TMP_ZIP = "/tmp/engine.zip"
 EXTRACT_DIR = "/tmp/deobf_engine"
-
-class Payload(BaseModel):
-    raw_text: str
 
 def extract_vm_payload(raw_text: str) -> str:
     try:
@@ -36,7 +32,7 @@ def extract_vm_payload(raw_text: str) -> str:
 
 @app.post("/api/deobfuscate")
 async def deobfuscate(raw_text: str = Form(...), engine_zip: UploadFile = File(...)):
-    # 1. Guardar y extraer el ZIP
+    # 1. Extraer el ZIP
     if os.path.exists(EXTRACT_DIR):
         shutil.rmtree(EXTRACT_DIR)
     os.makedirs(EXTRACT_DIR, exist_ok=True)
@@ -50,30 +46,19 @@ async def deobfuscate(raw_text: str = Form(...), engine_zip: UploadFile = File(.
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error al descomprimir el ZIP: {str(e)}")
 
-    # 2. Buscar el script principal de Python dentro del ZIP
+    # 2. Buscar el archivo .py
     main_script = None
     for root, _, files in os.walk(EXTRACT_DIR):
         for file in files:
             if file.endswith(".py"):
-                # Buscamos nombres comunes del deobfuscador
-                if file in ["main.py", "deobfuscate.py", "run.py", "index.py"]:
-                    main_script = os.path.join(root, file)
-                    break
+                main_script = os.path.join(root, file)
+                break
         if main_script: break
-
-    if not main_script:
-        # Fallback: coger el primer .py que encontremos
-        for root, _, files in os.walk(EXTRACT_DIR):
-            for file in files:
-                if file.endswith(".py"):
-                    main_script = os.path.join(root, file)
-                    break
-            if main_script: break
 
     if not main_script:
         raise HTTPException(status_code=400, detail="No se encontró ningún archivo .py en el ZIP.")
 
-    # 3. Extraer el payload del dump de Luarmor
+    # 3. Extraer el payload
     try:
         vm_payload = extract_vm_payload(raw_text)
     except Exception as e:
@@ -82,18 +67,18 @@ async def deobfuscate(raw_text: str = Form(...), engine_zip: UploadFile = File(.
     with open(TMP_IN, "w", encoding="utf-8") as f:
         f.write(vm_payload)
 
-    # 4. Ejecutar el script del usuario
+    # 4. Ejecutar el script
     try:
-        # Le pasamos el archivo de entrada y el de salida como argumentos
+        # Intentar con el argumento -o
         result = subprocess.run(
             [sys.executable, main_script, TMP_IN, "-o", TMP_OUT],
             cwd=os.path.dirname(main_script),
             capture_output=True,
             text=True,
-            timeout=10 # Límite de Vercel Hobby
+            timeout=10
         )
         
-        # Si falla con -o, intentamos sin -o (por si el script es diferente)
+        # Fallback: intentar sin -o por si el script imprime directo
         if result.returncode != 0 or not os.path.exists(TMP_OUT):
             result = subprocess.run(
                 [sys.executable, main_script, TMP_IN],
@@ -102,22 +87,19 @@ async def deobfuscate(raw_text: str = Form(...), engine_zip: UploadFile = File(.
                 text=True,
                 timeout=10
             )
-            # Si imprimió el resultado en consola (stdout) en vez de guardarlo en archivo
             if result.returncode == 0 and result.stdout.strip():
-                clean_code = result.stdout.strip()
-                return {"success": True, "code": clean_code}
+                return {"success": True, "code": result.stdout.strip()}
 
         if result.returncode != 0:
-            output = result.stderr or result.stdout
-            raise HTTPException(status_code=500, detail=f"Error del deobfuscador:\n{output[-500:]}")
+            error_msg = result.stderr or result.stdout or "Error desconocido"
+            raise HTTPException(status_code=500, detail=f"Error del deobfuscador:\n{error_msg[-500:]}")
 
         if not os.path.exists(TMP_OUT):
-            raise HTTPException(status_code=500, detail="El script terminó pero no generó el archivo de salida ni imprimió el código.")
+            raise HTTPException(status_code=500, detail="El script no generó la salida.")
 
         with open(TMP_OUT, "r", encoding="utf-8") as f:
             clean_code = f.read()
 
-        # Limpieza
         if os.path.exists(TMP_IN): os.remove(TMP_IN)
         if os.path.exists(TMP_OUT): os.remove(TMP_OUT)
 
