@@ -1,1 +1,9 @@
-https://github.com/mehCake/luraph-deobfuscator-py.git
+{
+  "buildCommand": "git clone https://github.com/mehCake/luraph-deobfuscator-py.git luraph-deobfuscator-py",
+  "rewrites": [
+    {
+      "source": "/api/deobfuscate",
+      "destination": "/api/index.py"
+    }
+  ]
+}
