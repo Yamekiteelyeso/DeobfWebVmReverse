@@ -72,7 +72,8 @@ async function deobfuscate() {
 
     try {
         const formData = new FormData();
-        formData.append('raw_text', raw);
+        // Se envía como archivo para evitar el límite de 1 MB de los campos de texto
+        formData.append('raw_file', new Blob([raw], { type: 'text/plain' }), 'dump.txt');
         if (zipFile) formData.append('engine_zip', zipFile);
 
         const response = await fetch('/api/deobfuscate', {
