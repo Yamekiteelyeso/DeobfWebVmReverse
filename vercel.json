@@ -1,9 +1,22 @@
 {
-  "buildCommand": "git clone https://github.com/mehCake/luraph-deobfuscator-py.git luraph-deobfuscator-py",
-  "rewrites": [
+  "builds": [
     {
-      "source": "/api/deobfuscate",
-      "destination": "/api/index.py"
+      "src": "api/index.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/deobfuscate",
+      "dest": "api/index.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "index.html"
     }
   ]
 }
