@@ -1,225 +1,51 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Luraph VM Deobfuscator</title>
-    <style>
-        :root {
-            --bg: #0d1117; --panel: #161b22; --border: #30363d;
-            --text: #c9d1d9; --text-muted: #8b949e; --accent: #58a6ff;
-            --accent-hover: #3182ce; --success: #3fb950; --error: #f85149;
-            --font: 'Consolas', 'Courier New', monospace;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            background-color: var(--bg); color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            height: 100vh; display: flex; flex-direction: column;
-        }
-        header {
-            background-color: var(--panel); border-bottom: 1px solid var(--border);
-            padding: 15px 20px; display: flex; justify-content: space-between;
-            align-items: center; flex-wrap: wrap; gap: 10px;
-        }
-        header h1 { font-size: 1.2rem; font-weight: 600; }
-        header h1 span { color: var(--accent); }
-        
-        .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-        button, .file-label {
-            background-color: var(--accent); color: #fff; border: none;
-            padding: 8px 16px; border-radius: 6px; font-weight: 600;
-            cursor: pointer; transition: 0.2s; font-size: 0.9rem;
-            text-align: center; display: inline-block;
-        }
-        button:hover, .file-label:hover { background-color: var(--accent-hover); }
-        button:disabled { background-color: var(--border); cursor: not-allowed; }
-        button.secondary { background-color: #21262d; border: 1px solid var(--border); color: var(--text); }
-        button.secondary:hover { background-color: #30363d; }
-        
-        .zip-label { background-color: #21262d; border: 1px solid var(--border); }
-        .zip-label:hover { background-color: #30363d; }
+async function deobfuscate() {
+    const raw = inputArea.value.trim();
+    const zipFile = zipInput.files[0];
 
-        .main-container {
-            display: flex; flex: 1; padding: 20px; gap: 20px; overflow: hidden;
-        }
-        .panel {
-            flex: 1; display: flex; flex-direction: column;
-            background-color: var(--panel); border: 1px solid var(--border);
-            border-radius: 8px; overflow: hidden; min-height: 0;
-        }
-        .panel-header {
-            padding: 10px 15px; background-color: #1f242c; border-bottom: 1px solid var(--border);
-            font-size: 0.85rem; font-weight: 600; color: var(--text-muted);
-            display: flex; justify-content: space-between; align-items: center;
-            flex-wrap: wrap; gap: 8px;
-        }
-        .panel-actions { display: flex; gap: 8px; align-items: center; }
-        
-        textarea {
-            flex: 1; width: 100%; background-color: transparent; border: none;
-            color: var(--text); font-family: var(--font); font-size: 0.9rem;
-            padding: 15px; resize: none; outline: none; white-space: pre; overflow: auto;
-        }
-        
-        input[type="file"] { display: none; }
-        
-        #status { font-size: 0.85rem; font-weight: normal; }
-        .status-success { color: var(--success); }
-        .status-error { color: var(--error); }
-        .status-loading { color: var(--accent); }
+    if (!raw) { setStatus('Pega un dump primero.', 'error'); return; }
+    if (!zipFile) { setStatus('Sube el .zip del motor.', 'error'); return; }
 
-        @media (max-width: 768px) {
-            .main-container { flex-direction: column; padding: 10px; gap: 10px; }
-            header { padding: 10px 15px; }
-            header h1 { font-size: 1rem; }
-            button, .file-label { padding: 6px 12px; font-size: 0.8rem; }
-        }
-    </style>
-</head>
-<body>
-    <header>
-        <h1><span>Luraph</span> VM Deobfuscator</h1>
-        <div class="controls">
-            <label class="file-label zip-label">
-                📦 Motor .zip
-                <input type="file" id="zip-input" accept=".zip" onchange="updateZipName(this)">
-            </label>
-            <span id="zip-name" style="font-size: 0.8rem; color: var(--text-muted); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Ningún .zip</span>
-            <button id="btn-deobf" onclick="deobfuscate()">Devirtualizar</button>
-        </div>
-    </header>
-    <div class="main-container">
-        <div class="panel">
-            <div class="panel-header">
-                <span>Dump (JSON / VM Raw)</span>
-                <span id="in-size">0 bytes</span>
-            </div>
-            <textarea id="input" placeholder="Pega aquí el texto de tu dump..." oninput="updateSize()"></textarea>
-        </div>
-        <div class="panel">
-            <div class="panel-header">
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <span>Código Limpio</span>
-                    <span id="status">Esperando...</span>
-                </div>
-                <div class="panel-actions">
-                    <button id="btn-copy" class="secondary" onclick="copyOutput()" disabled>Copiar</button>
-                    <button id="btn-download" class="secondary" onclick="downloadOutput()" disabled>Descargar</button>
-                </div>
-            </div>
-            <textarea id="output" readonly placeholder="El código deobfuscado aparecerá aquí..."></textarea>
-        </div>
-    </div>
+    btnDeobf.disabled = true;
+    btnCopy.disabled = true;
+    btnDownload.disabled = true;
+    outputArea.value = '';
+    setStatus('Procesando VM...', 'loading');
 
-    <script>
-        const inputArea = document.getElementById('input');
-        const outputArea = document.getElementById('output');
-        const btnDeobf = document.getElementById('btn-deobf');
-        const btnCopy = document.getElementById('btn-copy');
-        const btnDownload = document.getElementById('btn-download');
-        const statusText = document.getElementById('status');
-        const inSize = document.getElementById('in-size');
-        const zipInput = document.getElementById('zip-input');
-        const zipName = document.getElementById('zip-name');
+    try {
+        const formData = new FormData();
+        formData.append('raw_text', raw);
+        formData.append('engine_zip', zipFile);
 
-        function updateSize() {
-            const bytes = new Blob([inputArea.value]).size;
-            inSize.textContent = bytes.toLocaleString() + ' bytes';
-        }
+        const response = await fetch('/api/deobfuscate', {
+            method: 'POST',
+            body: formData
+        });
 
-        function updateZipName(input) {
-            if (input.files && input.files[0]) {
-                zipName.textContent = input.files[0].name;
-                zipName.style.color = 'var(--success)';
+        // Leer como texto primero para evitar el error de JSON
+        const textData = await response.text();
+        let data;
+
+        try {
+            data = JSON.parse(textData);
+        } catch (e) {
+            if (textData.includes("The page c")) {
+                throw new Error("Vercel 404: Revisa el archivo vercel.json.");
             }
+            throw new Error("Respuesta inesperada del servidor (No es JSON).");
         }
 
-        async function deobfuscate() {
-            const raw = inputArea.value.trim();
-            const zipFile = zipInput.files[0];
-
-            if (!raw) {
-                setStatus('Pega un dump primero.', 'error');
-                return;
-            }
-            if (!zipFile) {
-                setStatus('Sube el .zip del motor.', 'error');
-                return;
-            }
-
-            btnDeobf.disabled = true;
-            btnCopy.disabled = true;
-            btnDownload.disabled = true;
-            outputArea.value = '';
-            setStatus('Procesando VM...', 'loading');
-
-            try {
-                // Usamos FormData para enviar texto y archivo
-                const formData = new FormData();
-                formData.append('raw_text', raw);
-                formData.append('engine_zip', zipFile);
-
-                const response = await fetch('/api/deobfuscate', {
-                    method: 'POST',
-                    body: formData // No cabecera Content-Type, el navegador la pone con el boundary
-                });
-
-                const textData = await response.text();
-                let data;
-
-                try {
-                    data = JSON.parse(textData);
-                } catch (e) {
-                    throw new Error("El servidor no devolvió JSON. ¿Falta alguna dependencia o el script dio error?");
-                }
-
-                if (!response.ok) {
-                    throw new Error(data.detail || 'Error desconocido');
-                }
-
-                outputArea.value = data.code;
-                setStatus('¡Completado!', 'success');
-                btnCopy.disabled = false;
-                btnDownload.disabled = false;
-            } catch (err) {
-                setStatus('Fallo', 'error');
-                outputArea.value = "[-] ERROR:\n" + err.message;
-            } finally {
-                btnDeobf.disabled = false;
-            }
+        if (!response.ok) {
+            throw new Error(data.detail || 'Error desconocido');
         }
 
-        async function copyOutput() {
-            if (!outputArea.value) return;
-            try {
-                await navigator.clipboard.writeText(outputArea.value);
-                const originalText = btnCopy.textContent;
-                btnCopy.textContent = '¡Copiado!';
-                setTimeout(() => btnCopy.textContent = originalText, 2000);
-            } catch (err) {
-                setStatus('Error al copiar', 'error');
-            }
-        }
-
-        function downloadOutput() {
-            if (!outputArea.value) return;
-            const blob = new Blob([outputArea.value], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'deobfuscated.txt';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            setStatus('Descargado', 'success');
-        }
-
-        function setStatus(msg, type) {
-            statusText.textContent = msg;
-            statusText.className = 'status-' + type;
-        }
-    </script>
-</body>
-</html>
+        outputArea.value = data.code;
+        setStatus('¡Completado!', 'success');
+        btnCopy.disabled = false;
+        btnDownload.disabled = false;
+    } catch (err) {
+        setStatus('Fallo', 'error');
+        outputArea.value = "[-] ERROR:\n" + err.message;
+    } finally {
+        btnDeobf.disabled = false;
+    }
+}
