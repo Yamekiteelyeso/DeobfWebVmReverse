@@ -25,8 +25,9 @@
 <div class="wrap">
   <h1>Luraph VM Deobfuscator</h1>
 
-  <label for="inputArea">Dump / script ofuscado</label>
-  <textarea id="inputArea" placeholder="Pega aquí el dump..."></textarea>
+  <label for="inputArea">Dump / script ofuscado (pega el texto o sube un .txt / .lua)</label>
+  <textarea id="inputArea" placeholder="Pega aquí el dump o arrastra un archivo .txt / .lua..."></textarea>
+  <input type="file" id="dumpInput" accept=".txt,.lua,.luau,text/plain">
 
   <label for="zipInput">Motor (.zip con deob.js) — opcional si el repo ya incluye la carpeta engine/</label>
   <input type="file" id="zipInput" accept=".zip">
@@ -45,6 +46,7 @@
 <script>
 const inputArea = document.getElementById('inputArea');
 const zipInput = document.getElementById('zipInput');
+const dumpInput = document.getElementById('dumpInput');
 const outputArea = document.getElementById('outputArea');
 const btnDeobf = document.getElementById('btnDeobf');
 const btnCopy = document.getElementById('btnCopy');
@@ -111,6 +113,28 @@ async function deobfuscate() {
         btnDeobf.disabled = false;
     }
 }
+
+async function loadDumpFile(file) {
+    if (!file) return;
+    if (!/\.(txt|lua|luau)$/i.test(file.name)) {
+        setStatus('Solo se permiten archivos .txt, .lua o .luau.', 'error');
+        return;
+    }
+    try {
+        inputArea.value = await file.text();
+        setStatus('Cargado: ' + file.name + ' (' + file.size + ' bytes)', 'success');
+    } catch (e) {
+        setStatus('No se pudo leer el archivo.', 'error');
+    }
+}
+
+dumpInput.addEventListener('change', () => loadDumpFile(dumpInput.files[0]));
+
+inputArea.addEventListener('dragover', (e) => e.preventDefault());
+inputArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    loadDumpFile(e.dataTransfer.files[0]);
+});
 
 btnDeobf.addEventListener('click', deobfuscate);
 
