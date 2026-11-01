@@ -1,11 +1,8 @@
 {
   "functions": {
-    "api/index.py": {
+    "api/deobfuscate.py": {
       "maxDuration": 60,
       "includeFiles": "engine/**"
     }
-  },
-  "rewrites": [
-    { "source": "/api/deobfuscate", "destination": "/api/index" }
-  ]
+  }
 }
