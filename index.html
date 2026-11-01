@@ -114,7 +114,6 @@
         .status-error { color: var(--error); }
         .status-loading { color: var(--accent); }
 
-        /* Responsividad para móviles */
         @media (max-width: 768px) {
             .main-container {
                 flex-direction: column;
@@ -189,7 +188,7 @@
                 setStatus('Archivo cargado', 'success');
             };
             reader.readAsText(file);
-            fileInput.value = ''; // Reset para permitir subir el mismo archivo de nuevo
+            fileInput.value = ''; 
         }
 
         async function deobfuscate() {
@@ -260,6 +259,6 @@
             statusText.textContent = msg;
             statusText.className = 'status-' + type;
         }
-    </style>
+    </script>
 </body>
 </html>
