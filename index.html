@@ -6,103 +6,60 @@
     <title>Luraph VM Deobfuscator</title>
     <style>
         :root {
-            --bg: #0d1117;
-            --panel: #161b22;
-            --border: #30363d;
-            --text: #c9d1d9;
-            --text-muted: #8b949e;
-            --accent: #58a6ff;
-            --accent-hover: #3182ce;
-            --success: #3fb950;
-            --error: #f85149;
+            --bg: #0d1117; --panel: #161b22; --border: #30363d;
+            --text: #c9d1d9; --text-muted: #8b949e; --accent: #58a6ff;
+            --accent-hover: #3182ce; --success: #3fb950; --error: #f85149;
             --font: 'Consolas', 'Courier New', monospace;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            background-color: var(--bg);
-            color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
+            background-color: var(--bg); color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            height: 100vh; display: flex; flex-direction: column;
         }
         header {
-            background-color: var(--panel);
-            border-bottom: 1px solid var(--border);
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
+            background-color: var(--panel); border-bottom: 1px solid var(--border);
+            padding: 15px 20px; display: flex; justify-content: space-between;
+            align-items: center; flex-wrap: wrap; gap: 10px;
         }
         header h1 { font-size: 1.2rem; font-weight: 600; }
         header h1 span { color: var(--accent); }
         
-        .controls { display: flex; gap: 10px; }
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
         button, .file-label {
-            background-color: var(--accent);
-            color: #fff;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: 0.2s;
-            font-size: 0.9rem;
-            text-align: center;
-            display: inline-block;
+            background-color: var(--accent); color: #fff; border: none;
+            padding: 8px 16px; border-radius: 6px; font-weight: 600;
+            cursor: pointer; transition: 0.2s; font-size: 0.9rem;
+            text-align: center; display: inline-block;
         }
         button:hover, .file-label:hover { background-color: var(--accent-hover); }
         button:disabled { background-color: var(--border); cursor: not-allowed; }
         button.secondary { background-color: #21262d; border: 1px solid var(--border); color: var(--text); }
         button.secondary:hover { background-color: #30363d; }
         
+        .zip-label { background-color: #21262d; border: 1px solid var(--border); }
+        .zip-label:hover { background-color: #30363d; }
+
         .main-container {
-            display: flex;
-            flex: 1;
-            padding: 20px;
-            gap: 20px;
-            overflow: hidden;
+            display: flex; flex: 1; padding: 20px; gap: 20px; overflow: hidden;
         }
         .panel {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background-color: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            overflow: hidden;
-            min-height: 0;
+            flex: 1; display: flex; flex-direction: column;
+            background-color: var(--panel); border: 1px solid var(--border);
+            border-radius: 8px; overflow: hidden; min-height: 0;
         }
         .panel-header {
-            padding: 10px 15px;
-            background-color: #1f242c;
-            border-bottom: 1px solid var(--border);
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 8px;
+            padding: 10px 15px; background-color: #1f242c; border-bottom: 1px solid var(--border);
+            font-size: 0.85rem; font-weight: 600; color: var(--text-muted);
+            display: flex; justify-content: space-between; align-items: center;
+            flex-wrap: wrap; gap: 8px;
         }
         .panel-actions { display: flex; gap: 8px; align-items: center; }
         
         textarea {
-            flex: 1;
-            width: 100%;
-            background-color: transparent;
-            border: none;
-            color: var(--text);
-            font-family: var(--font);
-            font-size: 0.9rem;
-            padding: 15px;
-            resize: none;
-            outline: none;
-            white-space: pre;
-            overflow: auto;
+            flex: 1; width: 100%; background-color: transparent; border: none;
+            color: var(--text); font-family: var(--font); font-size: 0.9rem;
+            padding: 15px; resize: none; outline: none; white-space: pre; overflow: auto;
         }
         
         input[type="file"] { display: none; }
@@ -113,11 +70,7 @@
         .status-loading { color: var(--accent); }
 
         @media (max-width: 768px) {
-            .main-container {
-                flex-direction: column;
-                padding: 10px;
-                gap: 10px;
-            }
+            .main-container { flex-direction: column; padding: 10px; gap: 10px; }
             header { padding: 10px 15px; }
             header h1 { font-size: 1rem; }
             button, .file-label { padding: 6px 12px; font-size: 0.8rem; }
@@ -126,12 +79,13 @@
 </head>
 <body>
     <header>
-        <h1><span>Luraph</span> VM Web Deobfuscator</h1>
+        <h1><span>Luraph</span> VM Deobfuscator</h1>
         <div class="controls">
-            <label class="file-label">
-                Subir .txt
-                <input type="file" id="file-input" accept=".txt" onchange="loadFile(event)">
+            <label class="file-label zip-label">
+                📦 Motor .zip
+                <input type="file" id="zip-input" accept=".zip" onchange="updateZipName(this)">
             </label>
+            <span id="zip-name" style="font-size: 0.8rem; color: var(--text-muted); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Ningún .zip</span>
             <button id="btn-deobf" onclick="deobfuscate()">Devirtualizar</button>
         </div>
     </header>
@@ -141,7 +95,7 @@
                 <span>Dump (JSON / VM Raw)</span>
                 <span id="in-size">0 bytes</span>
             </div>
-            <textarea id="input" placeholder="Pega aquí el texto de tu dump o sube un .txt..." oninput="updateSize()"></textarea>
+            <textarea id="input" placeholder="Pega aquí el texto de tu dump..." oninput="updateSize()"></textarea>
         </div>
         <div class="panel">
             <div class="panel-header">
@@ -166,30 +120,31 @@
         const btnDownload = document.getElementById('btn-download');
         const statusText = document.getElementById('status');
         const inSize = document.getElementById('in-size');
-        const fileInput = document.getElementById('file-input');
+        const zipInput = document.getElementById('zip-input');
+        const zipName = document.getElementById('zip-name');
 
         function updateSize() {
             const bytes = new Blob([inputArea.value]).size;
             inSize.textContent = bytes.toLocaleString() + ' bytes';
         }
 
-        function loadFile(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                inputArea.value = e.target.result;
-                updateSize();
-                setStatus('Archivo cargado', 'success');
-            };
-            reader.readAsText(file);
-            fileInput.value = '';
+        function updateZipName(input) {
+            if (input.files && input.files[0]) {
+                zipName.textContent = input.files[0].name;
+                zipName.style.color = 'var(--success)';
+            }
         }
 
         async function deobfuscate() {
             const raw = inputArea.value.trim();
+            const zipFile = zipInput.files[0];
+
             if (!raw) {
                 setStatus('Pega un dump primero.', 'error');
+                return;
+            }
+            if (!zipFile) {
+                setStatus('Sube el .zip del motor.', 'error');
                 return;
             }
 
@@ -200,13 +155,24 @@
             setStatus('Procesando VM...', 'loading');
 
             try {
+                // Usamos FormData para enviar texto y archivo
+                const formData = new FormData();
+                formData.append('raw_text', raw);
+                formData.append('engine_zip', zipFile);
+
                 const response = await fetch('/api/deobfuscate', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ raw_text: raw })
+                    body: formData // No cabecera Content-Type, el navegador la pone con el boundary
                 });
 
-                const data = await response.json();
+                const textData = await response.text();
+                let data;
+
+                try {
+                    data = JSON.parse(textData);
+                } catch (e) {
+                    throw new Error("El servidor no devolvió JSON. ¿Falta alguna dependencia o el script dio error?");
+                }
 
                 if (!response.ok) {
                     throw new Error(data.detail || 'Error desconocido');
