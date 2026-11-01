@@ -1,9 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Luraph VM Deobfuscator</title>
+<style>
+  :root { --bg:#0f1115; --card:#181b22; --text:#e6e8ee; --muted:#8b92a5; --accent:#6c8cff; --ok:#3ecf8e; --err:#ff5c6c; --border:#2a2f3b; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,sans-serif; }
+  .wrap { max-width:900px; margin:0 auto; display:flex; flex-direction:column; gap:12px; }
+  h1 { font-size:20px; margin:0; }
+  label { font-size:13px; color:var(--muted); }
+  textarea { width:100%; min-height:200px; background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:10px; font-family:ui-monospace,Consolas,monospace; font-size:12px; resize:vertical; }
+  input[type=file] { color:var(--muted); font-size:13px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  button { background:var(--accent); color:#fff; border:0; border-radius:8px; padding:10px 16px; font-size:14px; cursor:pointer; }
+  button.secondary { background:var(--card); border:1px solid var(--border); color:var(--text); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  #status { font-size:13px; color:var(--muted); }
+  #status.loading { color:var(--accent); } #status.success { color:var(--ok); } #status.error { color:var(--err); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Luraph VM Deobfuscator</h1>
+
+  <label for="inputArea">Dump / script ofuscado</label>
+  <textarea id="inputArea" placeholder="Pega aquí el dump..."></textarea>
+
+  <label for="zipInput">Motor (.zip con deob.js) — opcional si el repo ya incluye la carpeta engine/</label>
+  <input type="file" id="zipInput" accept=".zip">
+
+  <div class="row">
+    <button id="btnDeobf">Deobfuscar</button>
+    <button id="btnCopy" class="secondary" disabled>Copiar</button>
+    <button id="btnDownload" class="secondary" disabled>Descargar</button>
+    <span id="status"></span>
+  </div>
+
+  <label for="outputArea">Resultado</label>
+  <textarea id="outputArea" readonly></textarea>
+</div>
+
+<script>
+const inputArea = document.getElementById('inputArea');
+const zipInput = document.getElementById('zipInput');
+const outputArea = document.getElementById('outputArea');
+const btnDeobf = document.getElementById('btnDeobf');
+const btnCopy = document.getElementById('btnCopy');
+const btnDownload = document.getElementById('btnDownload');
+const statusEl = document.getElementById('status');
+
+function setStatus(msg, type) {
+    statusEl.textContent = msg;
+    statusEl.className = type || '';
+}
+
 async function deobfuscate() {
     const raw = inputArea.value.trim();
     const zipFile = zipInput.files[0];
 
     if (!raw) { setStatus('Pega un dump primero.', 'error'); return; }
-    if (!zipFile) { setStatus('Sube el .zip del motor.', 'error'); return; }
 
     btnDeobf.disabled = true;
     btnCopy.disabled = true;
@@ -14,12 +71,16 @@ async function deobfuscate() {
     try {
         const formData = new FormData();
         formData.append('raw_text', raw);
-        formData.append('engine_zip', zipFile);
+        if (zipFile) formData.append('engine_zip', zipFile);
 
         const response = await fetch('/api/deobfuscate', {
             method: 'POST',
             body: formData
         });
+
+        if (response.status === 413) {
+            throw new Error("El .zip es demasiado grande para Vercel (límite ~4.5 MB). Pon el motor en la carpeta engine/ del repo y no lo subas.");
+        }
 
         // Leer como texto primero para evitar el error de JSON
         const textData = await response.text();
@@ -31,11 +92,12 @@ async function deobfuscate() {
             if (textData.includes("The page c")) {
                 throw new Error("Vercel 404: Revisa el archivo vercel.json.");
             }
-            throw new Error("Respuesta inesperada del servidor (No es JSON).");
+            throw new Error("Respuesta inesperada del servidor (No es JSON, HTTP " + response.status + ").");
         }
 
         if (!response.ok) {
-            throw new Error(data.detail || 'Error desconocido');
+            const d = data.detail;
+            throw new Error(typeof d === 'string' ? d : (d ? JSON.stringify(d) : 'Error desconocido'));
         }
 
         outputArea.value = data.code;
@@ -49,3 +111,28 @@ async function deobfuscate() {
         btnDeobf.disabled = false;
     }
 }
+
+btnDeobf.addEventListener('click', deobfuscate);
+
+btnCopy.addEventListener('click', async () => {
+    try {
+        await navigator.clipboard.writeText(outputArea.value);
+        setStatus('Copiado', 'success');
+    } catch (e) {
+        outputArea.select();
+        document.execCommand('copy');
+        setStatus('Copiado', 'success');
+    }
+});
+
+btnDownload.addEventListener('click', () => {
+    const blob = new Blob([outputArea.value], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'clean.luau';
+    a.click();
+    URL.revokeObjectURL(a.href);
+});
+</script>
+</body>
+</html>
