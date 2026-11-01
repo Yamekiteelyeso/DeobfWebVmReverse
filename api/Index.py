@@ -32,7 +32,7 @@ def extract_vm_payload(raw_text: str) -> str:
 
 @app.post("/api/deobfuscate")
 async def deobfuscate(raw_text: str = Form(...), engine_zip: UploadFile = File(...)):
-    # 1. Extraer el ZIP
+    # 1. Limpiar y extraer el ZIP
     if os.path.exists(EXTRACT_DIR):
         shutil.rmtree(EXTRACT_DIR)
     os.makedirs(EXTRACT_DIR, exist_ok=True)
@@ -46,19 +46,25 @@ async def deobfuscate(raw_text: str = Form(...), engine_zip: UploadFile = File(.
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error al descomprimir el ZIP: {str(e)}")
 
-    # 2. Buscar el archivo .py
-    main_script = None
+    # 2. Buscar deob.js o un archivo .py válido
+    script_path = None
+    script_type = None
     for root, _, files in os.walk(EXTRACT_DIR):
+        if "deob.js" in files:
+            script_path = os.path.join(root, "deob.js")
+            script_type = "js"
+            break
         for file in files:
-            if file.endswith(".py"):
-                main_script = os.path.join(root, file)
+            if file.endswith(".py") and file != "build_luau.py": 
+                script_path = os.path.join(root, file)
+                script_type = "py"
                 break
-        if main_script: break
+        if script_path: break
 
-    if not main_script:
-        raise HTTPException(status_code=400, detail="No se encontró ningún archivo .py en el ZIP.")
+    if not script_path:
+        raise HTTPException(status_code=400, detail="No se encontró deob.js en el ZIP.")
 
-    # 3. Extraer el payload
+    # 3. Extraer el dump
     try:
         vm_payload = extract_vm_payload(raw_text)
     except Exception as e:
@@ -67,35 +73,39 @@ async def deobfuscate(raw_text: str = Form(...), engine_zip: UploadFile = File(.
     with open(TMP_IN, "w", encoding="utf-8") as f:
         f.write(vm_payload)
 
-    # 4. Ejecutar el script
+    # 4. Ejecutar el script (Node o Python)
     try:
-        # Intentar con el argumento -o
+        work_dir = os.path.dirname(script_path)
+
+        if script_type == "js":
+            # Instalar dependencias del package.json si existen (rápido)
+            pkg_path = os.path.join(work_dir, "package.json")
+            if os.path.exists(pkg_path):
+                subprocess.run("npm install --silent", cwd=work_dir, shell=True, timeout=10, capture_output=True)
+
+            # Ejecutar deob.js
+            cmd = ["node", script_path, TMP_IN, TMP_OUT]
+        else:
+            cmd = [sys.executable, script_path, TMP_IN, "-o", TMP_OUT]
+
         result = subprocess.run(
-            [sys.executable, main_script, TMP_IN, "-o", TMP_OUT],
-            cwd=os.path.dirname(main_script),
+            cmd,
+            cwd=work_dir,
             capture_output=True,
             text=True,
             timeout=10
         )
-        
-        # Fallback: intentar sin -o por si el script imprime directo
-        if result.returncode != 0 or not os.path.exists(TMP_OUT):
-            result = subprocess.run(
-                [sys.executable, main_script, TMP_IN],
-                cwd=os.path.dirname(main_script),
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            if result.returncode == 0 and result.stdout.strip():
+
+        # Si el script imprime directo en consola en vez de guardar archivo
+        if result.returncode == 0 and result.stdout.strip() and not os.path.exists(TMP_OUT):
                 return {"success": True, "code": result.stdout.strip()}
 
         if result.returncode != 0:
-            error_msg = result.stderr or result.stdout or "Error desconocido"
-            raise HTTPException(status_code=500, detail=f"Error del deobfuscador:\n{error_msg[-500:]}")
+            output = result.stderr or result.stdout
+            raise HTTPException(status_code=500, detail=f"Error del deobfuscador:\n{output[-500:]}")
 
         if not os.path.exists(TMP_OUT):
-            raise HTTPException(status_code=500, detail="El script no generó la salida.")
+            raise HTTPException(status_code=500, detail="El script terminó pero no generó el archivo de salida.")
 
         with open(TMP_OUT, "r", encoding="utf-8") as f:
             clean_code = f.read()
@@ -106,6 +116,6 @@ async def deobfuscate(raw_text: str = Form(...), engine_zip: UploadFile = File(.
         return {"success": True, "code": clean_code}
 
     except subprocess.TimeoutExpired:
-        raise HTTPException(status_code=504, detail="Timeout: El script tardó más de 10s (límite de Vercel).")
+        raise HTTPException(status_code=504, detail="Timeout: El script tardó más de 10s.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
