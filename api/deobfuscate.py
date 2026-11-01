@@ -110,7 +110,18 @@ def run_engine(script_path, script_type, work_dir, payload, tmp_in, tmp_out, tim
 
 
 @app.post("/api/deobfuscate")
-async def deobfuscate(raw_text: str = Form(...), engine_zip: Optional[UploadFile] = File(None)):
+async def deobfuscate(
+    raw_text: Optional[str] = Form(None),
+    raw_file: Optional[UploadFile] = File(None),
+    engine_zip: Optional[UploadFile] = File(None),
+):
+    # El dump llega como archivo (raw_file): los campos de texto de un form
+    # tienen un límite de 1 MB, los archivos no.
+    if raw_file is not None and getattr(raw_file, "filename", None):
+        raw_text = (await raw_file.read()).decode("utf-8", errors="replace")
+    if not raw_text or not raw_text.strip():
+        raise HTTPException(status_code=400, detail="No se recibió ningún dump.")
+
     work = tempfile.mkdtemp(prefix="deobf_")
     try:
         tmp_in = os.path.join(work, "payload.lua")
